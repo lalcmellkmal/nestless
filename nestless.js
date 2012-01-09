@@ -72,7 +72,7 @@ function func(node) {
 	stack.unshift(scope);
 
 	var params = node.params;
-	if (params) {
+	if (params && params.length) {
 		var lastParam = params[params.length-1];
 		if (lastParam.match(CALLBACK_RE))
 			scope.callback = lastParam;
@@ -92,14 +92,33 @@ function func(node) {
 function expr(node) {
 	var scope = stack[0];
 	switch (node.type) {
+	case OBJECT_INIT:
+		if (node.children.length == 0)
+			break;
+		node.children.forEach(function (propInit) {
+			propInit.children.forEach(expr);
+		});
+		break;
+
+	case AND:
+	case ARRAY_INIT:
+	case ASSIGN:
 	case CALL:
 	case DOT:
+	case INDEX:
+	case HOOK:
 	case LIST:
+	case NEW:
+	case NEW_WITH_ARGS:
+	case OR:
 		node.children.forEach(expr);
 		break;
 
 	case DELETE:
 	case IDENTIFIER:
+	case NULL:
+	case NUMBER:
+	case REGEXP:
 	case STRING:
 		break;
 
@@ -120,6 +139,7 @@ function expr(node) {
 
 	default:
 		console.log(nodeType(node));
+		console.log(node);
 		node.children.forEach(expr);
 		break;
 	}

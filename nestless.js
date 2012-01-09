@@ -42,7 +42,7 @@ function close(str) {
 	stack[0].closes.unshift(str);
 }
 
-function ppBlock(node, extra) {
+function block(node, extra) {
 	if (node.type != BLOCK)
 		throw new Nope("That's no block!", node);
 	var prev = stack[0] || {level: 0};
@@ -55,7 +55,7 @@ function ppBlock(node, extra) {
 			scope[k] = extra[k];
 
 	stack.unshift(scope);
-	node.children.forEach(pp);
+	node.children.forEach(stmt);
 	if (stack.shift() !== scope)
 		throw new Nope("Imbalanced block?!", node);
 
@@ -66,7 +66,7 @@ function ppBlock(node, extra) {
 	}
 }
 
-function ppFunc(node) {
+function func(node) {
 	var prev = stack[0] || {level: 0};
 	var scope = {level: prev.level+1, closes: []};
 	stack.unshift(scope);
@@ -82,56 +82,86 @@ function ppFunc(node) {
 		script = script.body;
 	if (script.type != SCRIPT)
 		throw new Nope("Unexpected in function form", node);
-	script.children.forEach(pp);
+	script.children.forEach(stmt);
 	if (stack.shift() !== scope)
 		throw new Nope("Imbalanced block?!", node);
 	if (scope.closes.length)
 		insert(node.end-1, scope.closes.join(''));
 }
 
-function pp(node) {
+function expr(node) {
 	var scope = stack[0];
 	switch (node.type) {
 	case CALL:
 	case DOT:
 	case LIST:
-		node.children.forEach(pp);
+		node.children.forEach(expr);
 		break;
 
+	case DELETE:
+	case IDENTIFIER:
+	case STRING:
+		break;
+
+	case FUNCTION:
+		func(node);
+		break;
+
+	case YIELD:
+		if (!stack.length)
+			throw new Nope("Can't yield in global scope", node);
+		var scope = stack[0];
+		if (scope.callback && scope.canYield) {
+			replace(node.start, node.start+6, 'return '+scope.callback+'(null, ');
+			insert(node.value.end, ')');
+		}
+		else
+			throw new Nope("Can't yield in non-bound scope", node);
+		break;
+
+	default:
+		console.log(nodeType(node));
+		node.children.forEach(expr);
+		break;
+	}
+}
+
+function stmt(node) {
+	var scope = stack[0];
+	switch (node.type) {
 	case BLOCK:
-		ppBlock(node);
+		block(node);
 		break;
 	case IF:
-		pp(node.thenPart);
+		stmt(node.thenPart);
 		if (node.elsePart)
-			pp(node.elsePart);
+			stmt(node.elsePart);
 		break;
 	case DO:
 	case FOR:
 	case WHILE:
 		// ignore conditions etc.
 		if (node.body.type == BLOCK)
-			ppBlock(node.body, {canBreakContinue: true});
+			block(node.body, {canBreakContinue: true});
 		else
-			pp(node.body);
+			stmt(node.body);
 		break;
 	case SWITCH:
 		node.cases.forEach(function (casa) {
-			ppBlock(casa.statements, {canBreakContinue: true, cannotBind: true});
+			block(casa.statements, {canBreakContinue: true, cannotBind: true});
 		});
 		break;
 	case TRY:
-		ppBlock(node.tryBlock, {canThrow: false});
-		node.catchClauses.forEach(pp);
+		block(node.tryBlock, {canThrow: false});
+		node.catchClauses.forEach(function (clause) {
+			block(clause.block);
+		});
 		if (node.finallyBlock)
-			ppBlock(node.finallyBlock);
-		break;
-	case CATCH:
-		ppBlock(node.block);
+			block(node.finallyBlock);
 		break;
 
 	case FUNCTION:
-		ppFunc(node);
+		func(node);
 		break;
 
 	case BREAK:
@@ -140,13 +170,9 @@ function pp(node) {
 			throw new Nope("Can't " + (node.type == BREAK ? "break" : "continue") + " after binding", node);
 		break;
 
-	case DELETE:
-	case IDENTIFIER:
-	case STRING:
-		break;
 	case RETURN:
 		if (node.children.length)
-			pp(node.children[0]);
+			expr(node.children[0]);
 		/* TODO: Check when can't eject */
 		break;
 	case SEMICOLON:
@@ -162,7 +188,7 @@ function pp(node) {
 		if (arrow.type != LT) {
 			//if (params.length)
 			//	throw new Nope("Orphaned comma expression", node);
-			pp(node.expression);
+			expr(node.expression);
 			break;
 		}
 		if (!stack.length)
@@ -208,24 +234,14 @@ function pp(node) {
 		}
 		break;
 	case VAR:
-		var init = node.children[0].initializer;
-		if (init)
-			pp(init);
-		break;
-	case YIELD:
-		if (!stack.length)
-			throw new Nope("Can't yield in global scope", node);
-		var scope = stack[0];
-		if (scope.callback && scope.canYield) {
-			replace(node.start, node.start+6, 'return '+scope.callback+'(null, ');
-			insert(node.value.end, ')');
-		}
-		else
-			throw new Nope("Can't yield in non-bound scope", node);
+		node.children.forEach(function (decl) {
+			if (decl.initializer)
+				expr(decl.initializer);
+		});
 		break;
 	default:
 		console.error(node);
-		throw new Nope('Unexpected', node);
+		throw new Nope('Unexpected ' + nodeType(node), node);
 	}
 }
 
@@ -290,7 +306,7 @@ function flatten(src, filename) {
 		delete root.tokenizer[k];
 	try {
 		// Don't want to create a global scope
-		root.children.forEach(pp);
+		root.children.forEach(stmt);
 	}
 	catch (e) {
 		if (!(e instanceof Nope))

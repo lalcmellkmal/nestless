@@ -285,6 +285,9 @@ util.inherits(Nope, Error);
 
 function flatten(src, filename) {
 	var root = parser.parse(src, filename);
+	/* clear out the damn tokenizer for debugging */
+	for (var k in root.tokenizer)
+		delete root.tokenizer[k];
 	try {
 		// Don't want to create a global scope
 		root.children.forEach(pp);
@@ -295,8 +298,8 @@ function flatten(src, filename) {
 		if (e.node) {
 			var node = e.node;
 			var frag = "<unknown fragment>";
-			if (node.getSource)
-				frag = ">>>" + node.getSource() + "<<<";
+			if (node.start && node.end)
+				frag = ">>>" + src.substring(node.start, node.end) + "<<<";
 			var loc = filename + ":" + (node.lineno || "") + ": ";
 			console.error(loc + frag);
 		}

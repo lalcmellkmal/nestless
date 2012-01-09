@@ -37,5 +37,5 @@ var test = function (cb) {
 	} while (false);
 	delete shit;
 	console.log('nope');
-	yield room; // we're done here.
+	return room; // we're done here.
 };

@@ -110,9 +110,8 @@ function expr(node) {
 	case YIELD:
 		if (!stack.length)
 			throw new Nope("Can't yield in global scope", node);
-		var scope = stack[0];
 		if (scope.callback && scope.canYield) {
-			replace(node.start, node.start+6, 'return '+scope.callback+'(null, ');
+			replace(node.start, node.start+6, scope.callback+'(null, ');
 			insert(node.value.end, ')');
 		}
 		else
@@ -173,8 +172,14 @@ function stmt(node) {
 	case RETURN:
 		if (node.children.length)
 			expr(node.children[0]);
-		/* TODO: Check when can't eject */
+		if (!stack.length)
+			throw new Nope("Can't return in global scope", node);
+		if (scope.callback && scope.canYield) {
+			replace(node.start, node.start+7, 'return '+scope.callback+'(null, ');
+			insert(node.value.end, ')');
+		}
 		break;
+
 	case SEMICOLON:
 		var arrow = node.expression;
 		var params = [];

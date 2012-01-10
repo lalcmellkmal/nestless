@@ -272,7 +272,7 @@ function stmt(node) {
 	}
 }
 
-function dumpPoints(points) {
+function dumpPoints(points, src) {
 	var prev = 0;
 	points.forEach(function (p) {
 		var color = require('ansi-color');
@@ -298,7 +298,7 @@ function emit(src, out) {
 	points.sort(function (b, a) { return b - a; });
 
 	if (OPTS.verbose)
-		dumpPoints(points);
+		dumpPoints(points, src);
 
 	out = out ? fs.createWriteStream(out) : process.stdout;
 	var pos = 0;

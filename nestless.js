@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 var fs = require('fs'),
     parser = require('./parser'),
     util = require('util');
@@ -11,6 +12,7 @@ const CALLBACK_RE = /c(?:all)?b(?:ack)?/i;
 // Global state
 var stack = [];
 var replacements = {};
+var OPTS = {};
 
 function nodeType(node) {
 	var type = node.type;
@@ -270,12 +272,7 @@ function stmt(node) {
 	}
 }
 
-function emit(src) {
-	var points = Object.keys(replacements).map(function (x) {
-		return parseInt(x, 10);
-	});
-	points.sort(function (b, a) { return b - a; });
-
+function dumpPoints(points) {
 	var prev = 0;
 	points.forEach(function (p) {
 		var color = require('ansi-color');
@@ -292,8 +289,18 @@ function emit(src) {
 		console.error(before + color.set(quote, 'red') + after + space + "-> '" + color.set(repl.str, 'green') + "'" + extra);
 		prev = repl.end;
 	});
+}
 
-	var out = process.stdout;
+function emit(src, out) {
+	var points = Object.keys(replacements).map(function (x) {
+		return parseInt(x, 10);
+	});
+	points.sort(function (b, a) { return b - a; });
+
+	if (OPTS.verbose)
+		dumpPoints(points);
+
+	out = out ? fs.createWriteStream(out) : process.stdout;
 	var pos = 0;
 	while (pos < src.length) {
 		var next = points.length ? points.shift() : src.length;
@@ -324,8 +331,7 @@ function Nope(message, node, end) {
 }
 util.inherits(Nope, Error);
 
-function flatten(src, filename) {
-	var root = parser.parse(src, filename);
+function flatten(root, filename) {
 	/* clear out the damn tokenizer for debugging */
 	for (var k in root.tokenizer)
 		delete root.tokenizer[k];
@@ -346,15 +352,74 @@ function flatten(src, filename) {
 		}
 		throw e;
 	}
-	emit(src);
 }
 exports.flatten = flatten;
 
 if (require.main === module) {
-	var filename = process.argv[2];
-	if (!filename) {
-		console.error("Filename required.");
-		process.exit(1);
+	var args = process.argv.slice(2);
+	var targets = [];
+	var outputFilename;
+	try {
+		while (args.length) {
+			var arg = args.shift();
+			if (!arg)
+				continue;
+			if (arg[0] != '-') {
+				targets.push(arg);
+				continue;
+			}
+			if (arg == '--') {
+				targets = targets.concat(args);
+				break;
+			}
+			else if (['-v', '--verbose'].indexOf(arg) >= 0)
+				OPTS.verbose = true;
+			else if (arg == '-o') {
+				if (outputFilename)
+					throw new Error("Multiple output filenames specified.");
+				outputFilename = arg;
+			}
+			else
+				throw new Error("Invalid argument: " + arg);
+		}
+		if (targets.length > 1 && outputFilename)
+			throw new Error("Can't specify an output filename with multiple inputs.");
 	}
-	flatten(fs.readFileSync(filename, 'UTF-8'), filename);
+	catch (e) {
+		console.error(e.message);
+		process.exit(-1);
+	}
+	if (targets.length) {
+		targets.forEach(function (filename) {
+			var dest = outputFilename;
+			if (!dest) {
+				var m = filename.match(/^(.*)\.nl$/);
+				dest = (m ? m[1] : filename) + '.js';
+			}
+			var src = fs.readFileSync(filename, 'UTF-8');
+			flatten(parser.parse(src, filename), filename);
+			emit(src, dest);
+		});
+	}
+	else {
+		process.stdin.resume();
+		// Buffer stdin
+		var bufs = [];
+		var len = 0;
+		process.stdin.on('data', function (data) {
+			bufs.push(data);
+			len += data.length;
+		});
+		process.stdin.on('end', function () {
+			var dest = new Buffer(len);
+			var pos = 0;
+			bufs.forEach(function (buf) {
+				buf.copy(dest, pos);
+				pos += buf.length;
+			});
+			var src = dest.toString('UTF-8');
+			flatten(parser.parse(src), '<stdin>');
+			emit(src, outputFilename);
+		});
+	}
 }

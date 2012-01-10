@@ -331,7 +331,8 @@ function Nope(message, node, end) {
 }
 util.inherits(Nope, Error);
 
-function flatten(root, filename) {
+function flatten(src, filename, outputFilename) {
+	var root = parser.parse(src, filename);
 	/* clear out the damn tokenizer for debugging */
 	for (var k in root.tokenizer)
 		delete root.tokenizer[k];
@@ -352,6 +353,7 @@ function flatten(root, filename) {
 		}
 		throw e;
 	}
+	emit(src, outputFilename);
 }
 exports.flatten = flatten;
 
@@ -399,8 +401,7 @@ if (require.main === module) {
 				dest = (m ? m[1] : filename) + '.js';
 			}
 			var src = fs.readFileSync(filename, 'UTF-8');
-			flatten(parser.parse(src, filename), filename);
-			emit(src, dest);
+			flatten(src, filename, dest);
 		});
 	}
 	else {
@@ -420,8 +421,7 @@ if (require.main === module) {
 				pos += buf.length;
 			});
 			var src = dest.toString('UTF-8');
-			flatten(parser.parse(src), '<stdin>');
-			emit(src, outputFilename);
+			flatten(src, '<stdin>', outputFilename);
 		});
 	}
 }

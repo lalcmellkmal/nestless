@@ -140,8 +140,8 @@ function expr(node) {
 		break;
 
 	default:
-		console.log(nodeType(node));
-		console.log(node);
+		console.error(nodeType(node));
+		console.error(node);
 		node.children.forEach(expr);
 		break;
 	}

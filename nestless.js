@@ -377,7 +377,9 @@ if (require.main === module) {
 			else if (arg == '-o') {
 				if (outputFilename)
 					throw new Error("Multiple output filenames specified.");
-				outputFilename = arg;
+				outputFilename = args.shift();
+				if (!outputFilename)
+					throw new Error("Output filename required.");
 			}
 			else
 				throw new Error("Invalid argument: " + arg);

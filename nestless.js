@@ -12,6 +12,7 @@ const CALLBACK_RE = /c(?:all)?b(?:ack)?/i;
 // Global state
 var stack = [];
 var replacements = {};
+var insertions = {};
 var OPTS = {};
 
 function nodeType(node) {
@@ -25,6 +26,8 @@ function nodeType(node) {
 function replace(start, end, str) {
 	if (!start)
 		throw new Nope("Invalid start", start, end);
+	if (end < start)
+		throw new Nope("Replacement would back up");
 	if (start in replacements)
 		throw new Nope("Replacement exists", start, end);
 	replacements[start] = {end: end, str: str};
@@ -33,11 +36,11 @@ function replace(start, end, str) {
 function insert(pos, str) {
 	if (!pos)
 		throw new Nope("Invalid insertion pos " + pos);
-	var old = replacements[pos];
+	var old = insertions[pos];
 	if (old)
-		old.str = str + old.str;
+		old.push(str);
 	else
-		replacements[pos] = {end: pos, str: str};
+		insertions[pos] = [str];
 }
 
 function close(str) {
@@ -274,32 +277,65 @@ function stmt(node) {
 }
 
 function stmts(nodes) {
-	nodes.forEach(stmt);
+	var scope = stack[0];
+	for (var i = 0; i < nodes.length; i++) {
+		var node = nodes[i];
+		if (scope.dead)
+			insert(node.start, '/* DEAD */ ');
+		stmt(node);
+		if (scope.returnAfter && i < nodes.length - 1) {
+			scope.returnAfter = false;
+			scope.dead = true;
+		}
+	}
 }
 
 function dumpPoints(points, src) {
 	var prev = 0;
 	points.forEach(function (p) {
 		var color = require('ansi-color');
+		var width = 60, context = 10;
+		var ins = insertions[p];
 		var repl = replacements[p];
-		var before = "replacing ..." + src.substring(p-10, p).replace(/\s/g, ' ') + '`';
-		var quote = src.substring(p, repl.end);
-		var after = "`" + src.substring(repl.end, repl.end+10).replace(/\s/g, ' ') + "...";
-		var width = 60;
-		var space = Math.max(0, width - before.length - quote.length - after.length - 2);
-		space = Array(space+1).join(' ');
-		var extra = '';
+		var end = repl ? repl.end : p;
+		var result = '';
+		var action = "inserting"
+		var before = " ..." + src.substring(p-context, p).replace(/\s/g, ' ') + '`';
+		var after = "`" + src.substring(end, end+context).replace(/\s/g, ' ') + "...";
+		var quote, rhs = '', quoteColor = 'green';
+		if (repl) {
+			quote = src.substring(p, end);
+			var result = repl.str;
+			if (ins)
+				result = ins.join('') + result;
+			if (result) {
+				quoteColor = 'yellow';
+				action = 'replacing';
+				var space = Math.max(0, width - action.length - before.length - quote.length - after.length - 2);
+				rhs = Array(space+1).join(' ') + "-> '" + color.set(result, quoteColor) + "'";
+			}
+			else {
+				quoteColor = 'red';
+				action = ' deleting';
+			}
+		}
+		else
+			quote = color.set(ins.join(''), 'green');
 		if (p < prev)
-			extra = color.set(' SKIPPED', 'red');
-		console.error(before + color.set(quote, 'red') + after + space + "-> '" + color.set(repl.str, 'green') + "'" + extra);
-		prev = repl.end;
+			rhs += color.set(' SKIPPED', 'red');
+		console.error(color.set(action, quoteColor) + before + color.set(quote, quoteColor) + after + rhs);
+		prev = end;
 	});
 }
 
 function emit(src, out) {
+	// Build a list of all insertion/replacement indices
 	var points = Object.keys(replacements).map(function (x) {
 		return parseInt(x, 10);
 	});
+	for (var x in insertions)
+		if (!(x in replacements))
+			points.push(parseInt(x, 10));
 	points.sort(function (b, a) { return b - a; });
 
 	if (OPTS.verbose)
@@ -311,20 +347,25 @@ function emit(src, out) {
 		var next = points.length ? points.shift() : src.length;
 		while (next < pos) {
 			var repl = replacements[next];
-			console.warn("\nSKIPPING REPLACEMENT >>>" + repl.str + "<<<\n");
+			if (repl)
+				throw new Error("Replacement >>>" + repl.str + "<<< was overwritten by another replacement");
+			var ins = insertions[next];
+			if (ins)
+				throw new Error("Insertion >>>" + ins.join('') + "<<< was overwritten by another replacement");
 			next = points.length ? points.shift() : src.length;
 		}
 		out.write(src.substring(pos, next));
 		pos = next;
 		if (next >= src.length)
 			break;
+		var ins = insertions[pos];
+		if (ins)
+			out.write(ins.join(''));
 		var repl = replacements[pos];
-		if (!repl)
-			throw new Error("Replacement disappeared at " + pos + "?!");
-		out.write(repl.str);
-		if (repl.end < pos)
-			throw new Error('Replacement would back up');
-		pos = repl.end;
+		if (repl) {
+			out.write(repl.str);
+			pos = repl.end;
+		}
 	}
 }
 

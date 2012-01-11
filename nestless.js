@@ -57,15 +57,15 @@ function block(node, extra) {
 			scope[k] = extra[k];
 
 	stack.unshift(scope);
-	node.children.forEach(stmt);
+	stmts(node.children);
 	if (stack.shift() !== scope)
 		throw new Nope("Imbalanced block?!", node);
 
-	if (scope.closes.length) {
-		if (!node.realEnd)
-			throw new Nope("Can't bind in a switch; please wrap with {}s", node);
-		insert(node.realEnd - 1, scope.closes.join(''));
-	}
+	var end = node.realEnd - 1;
+	if (scope.returnAfter)
+		insert(end, 'return; ');
+	if (scope.closes.length)
+		insert(end, scope.closes.join(''));
 }
 
 function func(node) {
@@ -84,7 +84,7 @@ function func(node) {
 		script = script.body;
 	if (script.type != SCRIPT)
 		throw new Nope("Unexpected in function form", node);
-	script.children.forEach(stmt);
+	stmts(script.children);
 	if (stack.shift() !== scope)
 		throw new Nope("Imbalanced block?!", node);
 	if (scope.closes.length)
@@ -199,6 +199,7 @@ function stmt(node) {
 		if (scope.callback && scope.canYield) {
 			replace(node.start, node.start+7, 'return '+scope.callback+'(null, ');
 			insert(node.value.end, ')');
+			scope.returnAfter = true;
 		}
 		break;
 
@@ -270,6 +271,10 @@ function stmt(node) {
 		console.error(node);
 		throw new Nope('Unexpected ' + nodeType(node), node);
 	}
+}
+
+function stmts(nodes) {
+	nodes.forEach(stmt);
 }
 
 function dumpPoints(points, src) {

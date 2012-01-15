@@ -71,7 +71,7 @@ function block(node, extra) {
 		insert(end, scope.closes.join(''));
 }
 
-function func(node) {
+function mutateFunc(node) {
 	var prev = stack[0] || {level: 0};
 	var scope = {level: prev.level+1, closes: []};
 	stack.unshift(scope);
@@ -95,13 +95,13 @@ function func(node) {
 }
 
 function expr(node) {
-	var scope = stack[0];
+	var thisExpr = expr.bind(this);
 	switch (node.type) {
 	case OBJECT_INIT:
 		if (node.children.length == 0)
 			break;
 		node.children.forEach(function (propInit) {
-			propInit.children.forEach(expr);
+			propInit.children.forEach(thisExpr);
 		});
 		break;
 
@@ -116,7 +116,7 @@ function expr(node) {
 	case NEW:
 	case NEW_WITH_ARGS:
 	case OR:
-		node.children.forEach(expr);
+		node.children.forEach(thisExpr);
 		break;
 
 	case DELETE:
@@ -128,27 +128,37 @@ function expr(node) {
 		break;
 
 	case FUNCTION:
-		func(node);
+		this.func(node);
 		break;
 
 	case YIELD:
+		this.yieldExpr(node);
+		break;
+
+	default:
+		console.error(nodeType(node));
+		console.error(node);
+		node.children.forEach(thisExpr);
+		break;
+	}
+}
+
+var mutator = {
+	expr: expr,
+	func: mutateFunc,
+	yieldExpr: function yieldExpr(node) {
 		if (!stack.length)
 			throw new Nope("Can't yield in global scope", node);
+		var scope = stack[0];
 		if (scope.callback && scope.canYield) {
 			replace(node.start, node.start+6, scope.callback+'(null, ');
 			insert(node.value.end, ')');
 		}
 		else
 			throw new Nope("Can't yield in non-bound scope", node);
-		break;
+	},
+};
 
-	default:
-		console.error(nodeType(node));
-		console.error(node);
-		node.children.forEach(expr);
-		break;
-	}
-}
 
 function stmt(node) {
 	var scope = stack[0];
@@ -185,7 +195,7 @@ function stmt(node) {
 		break;
 
 	case FUNCTION:
-		func(node);
+		mutateFunc(node);
 		break;
 
 	case BREAK:
@@ -196,7 +206,7 @@ function stmt(node) {
 
 	case RETURN:
 		if (node.children.length)
-			expr(node.children[0]);
+			mutator.expr(node.children[0]);
 		if (!stack.length)
 			throw new Nope("Can't return in global scope", node);
 		if (scope.callback && scope.canYield) {
@@ -219,7 +229,7 @@ function stmt(node) {
 		if (arrow.type != LT) {
 			//if (params.length)
 			//	throw new Nope("Orphaned comma expression", node);
-			expr(node.expression);
+			mutator.expr(node.expression);
 			break;
 		}
 		if (!stack.length)
@@ -267,7 +277,7 @@ function stmt(node) {
 	case VAR:
 		node.children.forEach(function (decl) {
 			if (decl.initializer)
-				expr(decl.initializer);
+				mutator.expr(decl.initializer);
 		});
 		break;
 	default:

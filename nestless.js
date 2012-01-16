@@ -311,14 +311,8 @@ var mutator = {
 function stmt(node) {
 	var scope = stack[0];
 
-	if (OPTS.debug && stack.length > 1 && node.type != BLOCK) {
-		if (node.astBlock && node.astBlock.index)
-			insert(node.start, '/* block ' + node.astBlock.index + ' */ ');
-		else if (node.astBlock)
-			insert(node.start, '/* has no block index */ ');
-		else
-			insert(node.start, '/* has no block */ ');
-	}
+	if (OPTS.debug)
+		dumpBlock(node);
 
 	switch (node.type) {
 	case BLOCK:
@@ -431,6 +425,23 @@ function stmts(nodes) {
 			scope.dead = true;
 		}
 	}
+}
+
+function dumpBlock(node) {
+	if (node.type == BLOCK || stack.length < 2)
+		return;
+	var out = 'has no block';
+	var block = node.astBlock;
+	if (block) {
+		out = 'block ' + block.index;
+		if (block.exits.length) {
+			var exits = block.exits.map(function (x) {
+				return '' + x.index;
+			});
+			out += ' -> ' + exits.join(', ');
+		}
+	}
+	insert(node.start, '/* ' + out + ' */ ');
 }
 
 return {stmt: stmt, replacements: replacements, insertions: insertions};

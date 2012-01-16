@@ -47,11 +47,9 @@ var analyzer = {
 };
 
 function newBlock(entry) {
-	var block = {exits: [], index: blockCtr++};
-	if (entry) {
-		block.entry = entry;
+	var block = {exits: [], entrances: [], index: blockCtr++};
+	if (entry)
 		addExit(entry, block);
-	}
 	return block;
 }
 
@@ -167,9 +165,9 @@ function analyzeStmts(nodes, block) {
 		analyzeStmt(nodes[i]);
 	}
 	// scope is over
-	var src = findBlockNeedingExit(block);
-	if (src)
+	blocksNeedingExit(block).forEach(function (src) {
 		deferExit(prevLevel, src);
+	});
 	// let dangling exits pass-through to outer scope
 	if (thisLevel in defers) {
 		defers[thisLevel].forEach(function (block) {
@@ -188,19 +186,26 @@ function deferExit(toLevel, block) {
 
 function addExit(fromBlock, toBlock) {
 	fromBlock.exits.push(toBlock);
+	toBlock.entrances.push(fromBlock);
 }
 
-function findBlockNeedingExit(block) {
+function blocksNeedingExit(block) {
 	if (block.over)
-		return false;
-	while (!block.hasStmts) {
-		if (block.funcEntry)
-			return false;
-		if (!block.entry)
-			throw new Nope("Block has no entry?!");
-		block = block.entry;
+		return [];
+	var found = [];
+	var wanting = [block];
+	while (wanting.length) {
+		var nextGen = [];
+		wanting.forEach(function (block) {
+			if (block.hasStmts)
+				return found.push(block);
+			if (block.funcEntry)
+				return;
+			nextGen = nextGen.concat(block.entrances);
+		});
+		wanting = nextGen;
 	}
-	return block;
+	return found;
 }
 function analyzeScript(nodes) {
 	analyzeStmts(nodes, newBlock(null));

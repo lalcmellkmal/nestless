@@ -283,8 +283,18 @@ function block(node, extra) {
 		throw new Nope("Imbalanced block?!", node);
 
 	var end = node.realEnd - 1;
-	if (scope.returnAfter)
-		insert(end, 'return; ');
+	if (scope.returnAfter) {
+		var skip = false, last = node.children[node.children.length - 1];
+		if (last) {
+			var block = last.astBlock;
+			if (block && (block.returns || block.funcExit))
+				skip = true;
+		}
+		if (!skip)
+			insert(end, 'return; ');
+		else if (OPTS.debug)
+			insert(end, '/* dup ret */ ');
+	}
 	if (scope.closes.length)
 		insert(end, scope.closes.join(''));
 }

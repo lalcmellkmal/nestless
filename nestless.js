@@ -17,9 +17,11 @@ function analysis() {
 
 var stack = [];
 var defers = {};
+var blockCtr = 0;
 
 function analyzeFunc(node) {
-	var block = {exits: [], funcEntry: true};
+	var block = newBlock(null);
+	block.funcEntry = true;
 	node.entryBlock = block;
 	var script = node.body;
 	if (script.type == GENERATOR)
@@ -45,7 +47,7 @@ var analyzer = {
 };
 
 function newBlock(entry) {
-	var block = {exits: []};
+	var block = {exits: [], index: blockCtr++};
 	if (entry) {
 		block.entry = entry;
 		addExit(entry, block);
@@ -160,7 +162,6 @@ function analyzeStmts(nodes, block) {
 
 		// Do this stmt
 		var node = nodes[i];
-		console.log(node);
 		node.astBlock = block;
 		block.hasStmts = true;
 		analyzeStmt(nodes[i]);
@@ -303,6 +304,15 @@ var mutator = {
 
 function stmt(node) {
 	var scope = stack[0];
+
+	if (OPTS.debug && stack.length > 1 && node.type != BLOCK) {
+		if (node.astBlock && node.astBlock.index)
+			insert(node.start, '/* block ' + node.astBlock.index + ' */ ');
+		else if (node.astBlock)
+			insert(node.start, '/* has no block index */ ');
+		else
+			insert(node.start, '/* has no block */ ');
+	}
 
 	switch (node.type) {
 	case BLOCK:
@@ -660,6 +670,8 @@ if (require.main === module) {
 			}
 			else if (['-v', '--verbose'].indexOf(arg) >= 0)
 				OPTS.verbose = true;
+			else if (['-g', '--debug'].indexOf(arg) >= 0)
+				OPTS.debug = true;
 			else if (arg == '-o') {
 				if (outputFilename)
 					throw new Error("Multiple output filenames specified.");

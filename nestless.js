@@ -33,6 +33,7 @@ function analyzeFunc(node) {
 	var level = stack[0].level;
 	var oldDefers = defers[level];
 	delete defers[level];
+
 	analyzeStmts(script.children, block);
 	var funcExits = defers[level];
 	if (funcExits) {
@@ -41,6 +42,7 @@ function analyzeFunc(node) {
 			exitBlock.funcExit = true;
 		});
 	}
+
 	if (oldDefers)
 		defers[level] = oldDefers;
 	else
@@ -123,6 +125,7 @@ function analyzeStmt(node) {
 	case CONTINUE:
 		break;
 	case RETURN:
+		entryBlock.over = entryBlock.returns = true;
 		if (node.children.length)
 			analyzer.expr(node.children[0]);
 		break;
@@ -148,15 +151,22 @@ function analyzeStmts(nodes, block) {
 	if (!block)
 		throw new Nope("Block required", nodes.length ? nodes[0] : null);
 	// new scope
-	var prevLevel = stack[0] ? stack[0].level : 0;
+	var prevBlock = stack[0] || {level: 0};
+	var prevLevel = prevBlock.level;
 	var thisLevel = prevLevel + 1;
 	block.level = thisLevel;
+	if (prevBlock.dead || prevBlock.returns)
+		block.dead = true;
 	stack.unshift(block);
 
 	var len = nodes.length;
 	for (var i = 0; i < len; i++) {
-		if (block.over)
+		if (block.over) {
+			var dead = block.dead || block.returns;
 			stack[0] = block = newBlock(null);
+			if (dead)
+				block.dead = true;
+		}
 
 		// Since this is a real block, any defered exits should go here
 		if (thisLevel in defers) {
@@ -425,18 +435,14 @@ function stmts(nodes) {
 	var scope = stack[0];
 	for (var i = 0; i < nodes.length; i++) {
 		var node = nodes[i];
-		if (scope.dead)
+		if (node.astBlock && node.astBlock.dead)
 			insert(node.start, '/* DEAD */ ');
 		stmt(node);
-		if (scope.returnAfter && i < nodes.length - 1) {
-			scope.returnAfter = false;
-			scope.dead = true;
-		}
 	}
 }
 
 function dumpBlock(node) {
-	if (node.type == BLOCK || stack.length < 2)
+	if (node.type == BLOCK || stack.length < 1)
 		return;
 	var out = 'has no block';
 	var block = node.astBlock;
@@ -452,6 +458,8 @@ function dumpBlock(node) {
 		}
 		if (block.funcExit)
 			out += ' exit';
+		else if (block.returns)
+			out += ' ret';
 	}
 	insert(node.start, '/* ' + out + ' */ ');
 }

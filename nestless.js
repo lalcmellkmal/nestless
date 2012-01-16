@@ -15,13 +15,27 @@ var OPTS = {};
 
 function analysis() {
 
+var stack = [];
+var defers = {};
+
 function analyzeFunc(node) {
+	var block = {exits: [], funcEntry: true};
+	node.entryBlock = block;
 	var script = node.body;
 	if (script.type == GENERATOR)
 		script = script.body;
 	if (script.type != SCRIPT)
-		throw new Nope("Unexpected in function form", node);
-	analyzeStmts(script.children);
+		throw new Nope("Unexpected function form", node);
+
+	// Capture function exit blocks
+	var level = stack[0].level;
+	var oldDefers = defers[level];
+	delete defers[level];
+	analyzeStmts(script.children, block);
+	if (defers[level])
+		node.exitBlocks = defers[level];
+	if (oldDefers)
+		defers[level] = oldDefers;
 }
 
 var analyzer = {
@@ -30,44 +44,65 @@ var analyzer = {
 	yieldExpr: function (node) {},
 };
 
-function block(node) {
-	if (node.type != BLOCK)
-		throw new Nope("That's no block!", node);
-	analyzeStmts(node.children);
+function newBlock(entry) {
+	var block = {exits: []};
+	if (entry) {
+		block.entry = entry;
+		addExit(entry, block);
+	}
+	return block;
+}
+
+function analyzeBlock(node, block) {
+	if (node.type == BLOCK)
+		analyzeStmts(node.children, block);
+	else if (node instanceof Array)
+		analyzeStmts(node, block);
+	else {
+		block.braceless = true;
+		analyzeStmts([node], block);
+	}
 }
 
 function analyzeStmt(node) {
+	var entryBlock = stack[0];
 	var stmt = analyzeStmt;
 	switch (node.type) {
 	case BLOCK:
-		block(node);
+		entryBlock.over = true;
+		analyzeBlock(node, newBlock(entryBlock));
 		break;
 	case IF:
-		stmt(node.thenPart);
-		if (node.elsePart)
-			stmt(node.elsePart);
+		entryBlock.over = true;
+		analyzeBlock(node.thenPart, newBlock(entryBlock));
+		// Fake empty else if not present
+		var elseStmts = node.elsePart || [];
+		analyzeBlock(elseStmts, newBlock(entryBlock));
 		break;
 	case DO:
 	case FOR:
 	case WHILE:
 		// ignore conditions etc.
-		if (node.body.type == BLOCK)
-			block(node.body);
-		else
-			stmt(node.body);
+		// TODO: Exit analysis
+		analyzeBlock(node.body);
 		break;
 	case SWITCH:
+		entryBlock.over = true;
+		// OH GOD what about breaks
 		node.cases.forEach(function (casa) {
-			block(casa.statements);
+			analyzeBlock(casa.statements, newBlock(entryBlock));
 		});
 		break;
 	case TRY:
-		block(node.tryBlock);
+		entryBlock.over = true;
+		analyzeBlock(node.tryBlock, newBlock(entryBlock));
+		/*
 		node.catchClauses.forEach(function (clause) {
-			block(clause.block);
+			analyzeBlock(clause.block);
 		});
 		if (node.finallyBlock)
-			block(node.finallyBlock);
+			analyzeBlock(node.finallyBlock);
+		*/
 		break;
 	case FUNCTION:
 		analyzeFunc(node);
@@ -101,11 +136,76 @@ function analyzeStmt(node) {
 	}
 }
 
-function analyzeStmts(nodes) {
-	nodes.forEach(analyzeStmt);
+function analyzeStmts(nodes, block) {
+	if (!block)
+		throw new Nope("Block required", nodes.length ? nodes[0] : null);
+	// new scope
+	var prevLevel = stack[0] ? stack[0].level : 0;
+	var thisLevel = prevLevel + 1;
+	block.level = thisLevel;
+	stack.unshift(block);
+
+	var len = nodes.length;
+	for (var i = 0; i < len; i++) {
+		if (block.over)
+			stack[0] = block = newBlock(null);
+
+		// Since this is a real block, any defered exits should go here
+		if (thisLevel in defers) {
+			defers[thisLevel].forEach(function (oldBlock) {
+				addExit(oldBlock, block);
+			});
+			delete defers[thisLevel];
+		}
+
+		// Do this stmt
+		var node = nodes[i];
+		console.log(node);
+		node.astBlock = block;
+		block.hasStmts = true;
+		analyzeStmt(nodes[i]);
+	}
+	// scope is over
+	var src = findBlockNeedingExit(block);
+	if (src)
+		deferExit(prevLevel, src);
+	// let dangling exits pass-through to outer scope
+	if (thisLevel in defers) {
+		defers[thisLevel].forEach(function (block) {
+			deferExit(prevLevel, block);
+		});
+		delete defers[thisLevel];
+	}
+	stack.shift();
 }
 
-return analyzeStmt;
+function deferExit(toLevel, block) {
+	if (!(toLevel in defers))
+		defers[toLevel] = [];
+	defers[toLevel].push(block);
+}
+
+function addExit(fromBlock, toBlock) {
+	fromBlock.exits.push(toBlock);
+}
+
+function findBlockNeedingExit(block) {
+	if (block.over)
+		return false;
+	while (!block.hasStmts) {
+		if (block.funcEntry)
+			return false;
+		if (!block.entry)
+			throw new Nope("Block has no entry?!");
+		block = block.entry;
+	}
+	return block;
+}
+function analyzeScript(nodes) {
+	analyzeStmts(nodes, newBlock(null));
+}
+
+return analyzeScript;
 }
 
 /* MUTATION */
@@ -178,8 +278,6 @@ function mutateFunc(node) {
 	var script = node.body;
 	if (script.type == GENERATOR)
 		script = script.body;
-	if (script.type != SCRIPT)
-		throw new Nope("Unexpected in function form", node);
 	stmts(script.children);
 	if (stack.shift() !== scope)
 		throw new Nope("Imbalanced block?!", node);
@@ -517,11 +615,12 @@ function flatten(src, filename, outputFilename) {
 
 	var results;
 	try {
-		var analyzeStmt = analysis();
-		root.children.forEach(analyzeStmt);
+		var analyzeStmts = analysis();
+		analyzeStmts(root.children);
 
 		results = mutation();
 		var mutateStmt = results.stmt;
+		// Avoid creating a global scope
 		root.children.forEach(mutateStmt);
 	}
 	catch (e) {

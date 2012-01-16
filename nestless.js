@@ -83,8 +83,9 @@ function analyzeStmt(node) {
 	case FOR:
 	case WHILE:
 		// ignore conditions etc.
-		// TODO: Exit analysis
-		analyzeBlock(node.body);
+		// Not even bothering with loop analysis... out of scope for this project
+		entryBlock.over = true;
+		analyzeBlock(node.body, newBlock(entryBlock));
 		break;
 	case SWITCH:
 		entryBlock.over = true;
@@ -94,15 +95,18 @@ function analyzeStmt(node) {
 		});
 		break;
 	case TRY:
+		// This is not correct.
 		entryBlock.over = true;
-		analyzeBlock(node.tryBlock, newBlock(entryBlock));
-		/*
+		var tryBlock = newBlock(entryBlock);
+		analyzeBlock(node.tryBlock, tryBlock);
 		node.catchClauses.forEach(function (clause) {
-			analyzeBlock(clause.block);
+			analyzeBlock(clause.block, newBlock(tryBlock));
 		});
+		var finallyBlock = newBlock(entryBlock);
 		if (node.finallyBlock)
-			analyzeBlock(node.finallyBlock);
-		*/
+			analyzeBlock(node.finallyBlock, finallyBlock);
+		else
+			analyzeBlock([], finallyBlock);
 		break;
 	case FUNCTION:
 		analyzeFunc(node);
@@ -115,12 +119,8 @@ function analyzeStmt(node) {
 			analyzer.expr(node.children[0]);
 		break;
 	case SEMICOLON:
-		if (!splitArrow(node)) {
-			//if (params.length)
-			//	throw new Nope("Orphaned comma expression", node);
+		if (!splitArrow(node))
 			analyzer.expr(node.expression);
-			break;
-		}
 		break;
 	case THROW:
 		break;
@@ -207,6 +207,7 @@ function blocksNeedingExit(block) {
 	}
 	return found;
 }
+
 function analyzeScript(nodes) {
 	analyzeStmts(nodes, newBlock(null));
 }

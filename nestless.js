@@ -34,10 +34,17 @@ function analyzeFunc(node) {
 	var oldDefers = defers[level];
 	delete defers[level];
 	analyzeStmts(script.children, block);
-	if (defers[level])
-		node.exitBlocks = defers[level];
+	var funcExits = defers[level];
+	if (funcExits) {
+		node.exitBlocks = funcExits;
+		funcExits.forEach(function (exitBlock) {
+			exitBlock.funcExit = true;
+		});
+	}
 	if (oldDefers)
 		defers[level] = oldDefers;
+	else
+		delete defers[level];
 }
 
 var analyzer = {
@@ -75,9 +82,10 @@ function analyzeStmt(node) {
 	case IF:
 		entryBlock.over = true;
 		analyzeBlock(node.thenPart, newBlock(entryBlock));
-		// Fake empty else if not present
-		var elseStmts = node.elsePart || [];
-		analyzeBlock(elseStmts, newBlock(entryBlock));
+		if (node.elsePart)
+			analyzeBlock(node.elsePart, newBlock(entryBlock));
+		else
+			deferExit(entryBlock.level, entryBlock);
 		break;
 	case DO:
 	case FOR:
@@ -434,12 +442,16 @@ function dumpBlock(node) {
 	var block = node.astBlock;
 	if (block) {
 		out = 'block ' + block.index;
+		if (block.funcEntry)
+			out = 'entry ' + out;
 		if (block.exits.length) {
 			var exits = block.exits.map(function (x) {
 				return '' + x.index;
 			});
 			out += ' -> ' + exits.join(', ');
 		}
+		if (block.funcExit)
+			out += ' exit';
 	}
 	insert(node.start, '/* ' + out + ' */ ');
 }

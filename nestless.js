@@ -736,6 +736,14 @@ if (require.main === module) {
 		console.error(e.message);
 		process.exit(-1);
 	}
+
+	if (!OPTS.debug) {
+		process.once('uncaughtException', function (err) {
+			console.error(err.message || err);
+			process.exit(1);
+		});
+	}
+
 	if (targets.length) {
 		targets.forEach(function (filename) {
 			var dest = outputFilename;

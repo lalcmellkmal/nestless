@@ -245,7 +245,7 @@ function replace(start, end, str) {
 	if (!start)
 		throw new Nope("Invalid start", start, end);
 	if (end < start)
-		throw new Nope("Replacement would back up");
+		throw new Nope("Replacement " + start + '..' + end + " would back up", end, start);
 	if (start in replacements)
 		throw new Nope("Replacement exists", start, end);
 	replacements[start] = {end: end, str: str};

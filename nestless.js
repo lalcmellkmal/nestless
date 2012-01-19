@@ -412,9 +412,9 @@ function stmt(node) {
 		scope.canThrow = true;
 		scope.canBreakContinue = false;
 		replace(node.start, arrow.rhs.start, '');
-		var err = 'err';
-		arrow.params.unshift(err);
-		var newCall = 'function (' + arrow.params.join(', ') + ') { if ('+err+') return '+cb+'('+err;
+		var err = 'err', params = filterUnderscores(arrow.params);
+		params.unshift(err);
+		var newCall = 'function (' + params.join(', ') + ') { if ('+err+') return '+cb+'('+err;
 		if (arrow.argList.children.length > 0)
 			newCall = ', ' + newCall;
 		replace(arrow.argList.end, exprEnd(node), newCall);
@@ -634,6 +634,22 @@ function exprEnd(expr) {
 	if (expr.type == OBJECT_INIT)
 		return expr.end + 1;
 	return expr.end;
+}
+
+function filterUnderscores(input) {
+	var params = input.slice();
+	while (params.length && params[params.length-1] == '_')
+		params.pop();
+	var count = 0;
+	params.forEach(function (p) {
+		if (p == '_')
+			count++;
+	});
+	if (count > 1)
+		for (var i = 0, n = 1; i < params.length; i++)
+			if (params[i] == '_')
+				params[i] = '_' + (n++);
+	return params;
 }
 
 function Nope(message, node, end) {

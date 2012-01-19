@@ -583,28 +583,6 @@ function expr(node) {
 		});
 		break;
 
-	case AND:
-	case ARRAY_INIT:
-	case ASSIGN:
-	case CALL:
-	case DOT:
-	case INDEX:
-	case HOOK:
-	case LIST:
-	case NEW:
-	case NEW_WITH_ARGS:
-	case OR:
-		node.children.forEach(thisExpr);
-		break;
-
-	case DELETE:
-	case IDENTIFIER:
-	case NULL:
-	case NUMBER:
-	case REGEXP:
-	case STRING:
-		break;
-
 	case FUNCTION:
 		this.func(node);
 		break;
@@ -614,8 +592,6 @@ function expr(node) {
 		break;
 
 	default:
-		console.error(nodeType(node));
-		console.error(node);
 		node.children.forEach(thisExpr);
 		break;
 	}

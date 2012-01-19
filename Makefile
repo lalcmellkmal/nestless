@@ -1,2 +1,4 @@
 test:
-	node nestless.js target.js
+	@make --no-print-directory -C test test
+
+.PHONY: all test

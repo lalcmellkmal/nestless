@@ -291,9 +291,9 @@ function block(node, extra) {
 				skip = true;
 		}
 		if (!skip)
-			insert(end, 'return; ');
+			scope.closes.push('return; ');
 		else if (OPTS.debug)
-			insert(end, '/* dup ret */ ');
+			scope.closes.push('/* dup ret */ ');
 	}
 	if (scope.closes.length)
 		insert(end, scope.closes.join(''));

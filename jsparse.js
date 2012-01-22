@@ -979,6 +979,9 @@ Narcissus.parser = (function() {
             } while (!t.match(RIGHT_CURLY) && t.mustMatch(COMMA));
         }
 
+        // PLOX
+        n.realEnd = t.cursor;
+
         return n;
     }
 
@@ -1814,6 +1817,9 @@ Narcissus.parser = (function() {
                     }
                 } while (t.match(COMMA));
                 t.mustMatch(RIGHT_CURLY);
+
+                // PLOX
+                n.realEnd = t.cursor;
             }
             break;
 

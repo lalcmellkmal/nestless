@@ -22,10 +22,10 @@ function nextTest(tests) {
 	if (!tests.length)
 		return done();
 	var testNl = tests.shift();
-	var m = testNl.match(/^(test-.*)\.nl$/);
+	var m = testNl.match(/^(.*)\.nl$/);
 	if (!m)
 		return nextTest(tests);
-	var testJs = m[1] + '.js';
+	var testJs = 'test-' + m[1] + '.js';
 	total++;
 	fs.unlink(join(__dirname, testJs), function () {
 		compileNestless(testNl, testJs, function (err) {

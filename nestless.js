@@ -601,14 +601,17 @@ function splitArrow(node) {
 	var arrow = node.expression;
 	var params = [];
 	var validTuple = true;
-	while (arrow.type == COMMA) {
-		var ident = arrow.children[0];
-		if (!ident || ident.type != IDENTIFIER) {
-			valid = false;
-			break;
+	if (arrow.type == COMMA) {
+		var len = arrow.children.length;
+		for (var i = 0; i < len - 1; i++) {
+			var ident = arrow.children[i];
+			if (!ident || ident.type != IDENTIFIER) {
+				valid = false;
+				break;
+			}
+			params.push(ident.value);
 		}
-		params.push(ident.value);
-		arrow = arrow.children[1];
+		arrow = arrow.children[len - 1];
 	}
 	if (arrow.type != LT)
 		return false;

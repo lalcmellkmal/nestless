@@ -1,8 +1,13 @@
 var assert = require('assert');
 
+function passThrough(obj, cb) {
+	cb(null, obj);
+}
+
 function go(arg, cb) {
 	msg <- require('fs').readFile('message.txt', 'UTF-8');
-	return {wrap: {arg: arg, msg: msg}};
+	msgPrime <- passThrough({a: {msg: msg}});
+	return {wrap: {arg: arg, msg: msgPrime.a.msg}};
 }
 
 go('hello', function (err, obj) {

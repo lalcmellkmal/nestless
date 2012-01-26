@@ -282,7 +282,6 @@ function block(node, extra) {
 	if (stack.shift() !== scope)
 		throw new Nope("Imbalanced block?!", node);
 
-	var end = node.realEnd - 1;
 	if (scope.returnAfter) {
 		var skip = false, last = node.children[node.children.length - 1];
 		if (last) {
@@ -296,7 +295,7 @@ function block(node, extra) {
 			scope.closes.push('/* dup ret */ ');
 	}
 	if (scope.closes.length)
-		insert(end, scope.closes.join(''));
+		insert(node.end-1, scope.closes.join(''));
 }
 
 function mutateFunc(node) {

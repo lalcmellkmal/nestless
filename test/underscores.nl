@@ -1,7 +1,8 @@
-var assert = require('assert');
+var assert = require('assert'),
+    common = require('./common');
 
 function betweenTheLines(callback) {
-	guts <- require('fs').readFile('message.txt', 'UTF-8');
+	guts <- common.read();
 	callback(null, guts, false, false, 'Buster X', false);
 }
 
@@ -15,6 +16,6 @@ function go(cb) {
 
 go(function (err, obj) {
 	assert.ifError(err);
-	assert.equal(obj.guts, 'Hard work and guts!');
+	assert.equal(obj.guts, common.message);
 	assert.equal(obj.attack, 'Buster X');
 });

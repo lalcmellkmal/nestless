@@ -1964,9 +1964,11 @@ Narcissus.parser = (function() {
             break;
 
           case LEFT_PAREN:
+            var start = this.t.token.start;
             n = this.ParenExpression();
             this.mustMatch(RIGHT_PAREN);
             n.parenthesized = true;
+            n.start = start;
             break;
 
           case LET:

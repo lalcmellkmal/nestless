@@ -329,7 +329,7 @@ var mutator = {
 		var scope = stack[0];
 		if (scope.callback && scope.canYield) {
 			replace(node.start, node.start+6, scope.callback+'(null, ');
-			insert(exprEnd(node.value), ')');
+			insert(node.value.end, ')');
 		}
 		else
 			throw new Nope("Can't yield in non-bound scope", node);
@@ -390,7 +390,7 @@ function stmt(node) {
 			throw new Nope("Can't return in global scope", node);
 		if (scope.callback && scope.canYield) {
 			replace(node.start, node.start+7, 'return '+scope.callback+'(null, ');
-			insert(exprEnd(node.value), ')');
+			insert(node.value.end, ')');
 			scope.returnAfter = true;
 		}
 		break;
@@ -417,7 +417,7 @@ function stmt(node) {
 		var newCall = 'function (' + params.join(', ') + ') { if ('+err+') return '+cb+'('+err;
 		if (arrow.argList.children.length > 0)
 			newCall = ', ' + newCall;
-		replace(arrow.argList.end, exprEnd(node), newCall);
+		replace(arrow.argList.end, node.end, newCall);
 		close('}); ');
 		break;
 	case THROW:
@@ -426,7 +426,7 @@ function stmt(node) {
 		var scope = stack[0];
 		if (scope.callback && stack.canThrow) {
 			replace(node.start, node.start+6, 'return '+scope.callback+'(');
-			insert(exprEnd(node.exception), ')');
+			insert(node.exception.end, ')');
 		}
 		break;
 	case VAR:
@@ -628,10 +628,6 @@ function splitArrow(node) {
 	if (rhs.children.length != 2 || argList.type != LIST)
 		throw new Nope('Unexpected call format', rhs);
 	return {rhs: rhs, argList: argList, params: params};
-}
-
-function exprEnd(expr) {
-	return expr.end;
 }
 
 function filterUnderscores(input) {

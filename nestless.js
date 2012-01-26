@@ -631,8 +631,6 @@ function splitArrow(node) {
 }
 
 function exprEnd(expr) {
-	if (expr.type == OBJECT_INIT)
-		return expr.end + 1;
 	return expr.end;
 }
 

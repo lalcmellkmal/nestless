@@ -6,8 +6,10 @@ function betweenTheLines(callback) {
 }
 
 function go(cb) {
-	guts, _, _, attack, _ <- betweenTheLines();
-	assert.ok(typeof _ == 'undefined', 'Underscore not removed');
+	guts, _, _ <- betweenTheLines();
+	assert.ok(typeof _ == 'undefined', 'Underscores not removed');
+	_, _, _, attack, _ <- betweenTheLines();
+	assert.ok(typeof _ == 'undefined', 'Underscores not deduped');
 	return {guts: guts, attack: attack};
 }
 

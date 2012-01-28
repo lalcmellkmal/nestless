@@ -18,6 +18,7 @@ function analysis() {
 var stack = [];
 var defers = {};
 var blockCtr = 0;
+var breakLevels = [];
 
 function analyzeFunc(node) {
 	var block = newBlock(null);
@@ -64,12 +65,12 @@ function newBlock(entry) {
 
 function analyzeBlock(node, block) {
 	if (node.type == BLOCK)
-		analyzeStmts(node.children, block);
+		return analyzeStmts(node.children, block);
 	else if (node instanceof Array)
-		analyzeStmts(node, block);
+		return analyzeStmts(node, block);
 	else {
 		block.braceless = true;
-		analyzeStmts([node], block);
+		return analyzeStmts([node], block);
 	}
 }
 
@@ -92,17 +93,27 @@ function analyzeStmt(node) {
 	case DO:
 	case FOR:
 	case WHILE:
+		breakLevels.unshift(entryBlock.level);
 		// ignore conditions etc.
 		// Not even bothering with loop analysis... out of scope for this project
 		entryBlock.over = true;
 		analyzeBlock(node.body, newBlock(entryBlock));
+		breakLevels.shift();
 		break;
 	case SWITCH:
+		breakLevels.unshift(entryBlock.level);
 		entryBlock.over = true;
-		// OH GOD what about breaks
+		var fallThrough = false;
 		node.cases.forEach(function (casa) {
-			analyzeBlock(casa.statements, newBlock(entryBlock));
+			var caseEntry = newBlock(entryBlock);
+			if (fallThrough)
+				addExit(fallThrough, caseEntry);
+			var exitBlock = analyzeBlock(casa.statements, caseEntry);
+			fallThrough = exitBlock.dead ? false : exitBlock;
+			if (!fallThrough)
+				deferExit(breakLevels[0], exitBlock);
 		});
+		breakLevels.shift();
 		break;
 	case TRY:
 		// This is not correct.
@@ -123,6 +134,11 @@ function analyzeStmt(node) {
 		break;
 	case BREAK:
 	case CONTINUE:
+		// assuming switch
+		entryBlock.over = true;
+		deferExit(breakLevels[0], entryBlock);
+		var deadBlock = newBlock(entryBlock);
+		deadBlock.dead = true;
 		break;
 	case RETURN:
 		entryBlock.over = entryBlock.returns = true;
@@ -193,7 +209,7 @@ function analyzeStmts(nodes, block) {
 		});
 		delete defers[thisLevel];
 	}
-	stack.shift();
+	return stack.shift();
 }
 
 function deferExit(toLevel, block) {

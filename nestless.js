@@ -286,7 +286,7 @@ function block(node, extra) {
 		var skip = false, last = node.children[node.children.length - 1];
 		if (last) {
 			var block = last.astBlock;
-			if (block && (block.returns || block.funcExit))
+			if (block && block.funcExit)
 				skip = true;
 		}
 		if (!skip)

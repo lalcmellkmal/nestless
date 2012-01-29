@@ -97,6 +97,7 @@ function analyzeStmt(node) {
 		break;
 	case DO:
 	case FOR:
+	case FOR_IN:
 	case WHILE:
 		escapeLevels.unshift(curLevel);
 		// ignore conditions etc.
@@ -377,6 +378,7 @@ function stmt(node) {
 		break;
 	case DO:
 	case FOR:
+	case FOR_IN:
 	case WHILE:
 		if (node.body.type == BLOCK)
 			block(node.body, {canBreakContinue: true});

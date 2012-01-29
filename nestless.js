@@ -51,11 +51,23 @@ function analyzeFunc(node) {
 		delete defers[level];
 }
 
-var analyzer = {
-	expr: expr,
-	func: analyzeFunc,
-	yieldExpr: function (node) {},
-};
+function analyzeExpr(node) {
+	switch (node.type) {
+	case OBJECT_INIT:
+		node.children.forEach(function (propInit) {
+			propInit.children.forEach(analyzeExpr);
+		});
+		break;
+
+	case FUNCTION:
+		analyzeFunc(node);
+		break;
+
+	default:
+		node.children.forEach(analyzeExpr);
+		break;
+	}
+}
 
 function newBlock(entry) {
 	var block = {exits: [], entrances: [], index: blockCtr++};
@@ -153,18 +165,18 @@ function analyzeStmt(node) {
 	case RETURN:
 		entryBlock.over = entryBlock.returns = true;
 		if (node.children.length)
-			analyzer.expr(node.children[0]);
+			analyzeExpr(node.children[0]);
 		break;
 	case SEMICOLON:
 		if (!splitArrow(node))
-			analyzer.expr(node.expression);
+			analyzeExpr(node.expression);
 		break;
 	case THROW:
 		break;
 	case VAR:
 		node.children.forEach(function (decl) {
 			if (decl.initializer)
-				analyzer.expr(decl.initializer);
+				analyzeExpr(decl.initializer);
 		});
 		break;
 	default:
@@ -345,10 +357,19 @@ function mutateFunc(node) {
 		insert(node.end-1, scope.closes.join(''));
 }
 
-var mutator = {
-	expr: expr,
-	func: mutateFunc,
-	yieldExpr: function yieldExpr(node) {
+function mutateExpr(node) {
+	switch (node.type) {
+	case OBJECT_INIT:
+		node.children.forEach(function (propInit) {
+			propInit.children.forEach(mutateExpr);
+		});
+		break;
+
+	case FUNCTION:
+		mutateFunc(node);
+		break;
+
+	case YIELD:
 		if (!stack.length)
 			throw new Nope("Can't yield in global scope", node);
 		var scope = stack[0];
@@ -358,8 +379,14 @@ var mutator = {
 		}
 		else
 			throw new Nope("Can't yield in non-bound scope", node);
-	},
-};
+		break;
+
+	default:
+		node.children.forEach(mutateExpr);
+		break;
+	}
+}
+
 
 function stmt(node) {
 	var scope = stack[0];
@@ -411,7 +438,7 @@ function stmt(node) {
 
 	case RETURN:
 		if (node.children.length)
-			mutator.expr(node.children[0]);
+			mutateExpr(node.children[0]);
 		if (!stack.length)
 			throw new Nope("Can't return in global scope", node);
 		if (node.value && scope.callback && scope.canYield) {
@@ -424,7 +451,7 @@ function stmt(node) {
 	case SEMICOLON:
 		var arrow = splitArrow(node);
 		if (!arrow) {
-			mutator.expr(node.expression);
+			mutateExpr(node.expression);
 			break;
 		}
 		if (!stack.length)
@@ -458,7 +485,7 @@ function stmt(node) {
 	case VAR:
 		node.children.forEach(function (decl) {
 			if (decl.initializer)
-				mutator.expr(decl.initializer);
+				mutateExpr(decl.initializer);
 		});
 		break;
 	default:
@@ -595,32 +622,6 @@ function nodeType(node) {
 		if (tokenIds[name] === type)
 			return name;
 	return '<unknown node type>';
-}
-
-// Generic expression walker
-function expr(node) {
-	var thisExpr = expr.bind(this);
-	switch (node.type) {
-	case OBJECT_INIT:
-		if (node.children.length == 0)
-			break;
-		node.children.forEach(function (propInit) {
-			propInit.children.forEach(thisExpr);
-		});
-		break;
-
-	case FUNCTION:
-		this.func(node);
-		break;
-
-	case YIELD:
-		this.yieldExpr(node);
-		break;
-
-	default:
-		node.children.forEach(thisExpr);
-		break;
-	}
 }
 
 function splitArrow(node) {

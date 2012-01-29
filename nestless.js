@@ -18,7 +18,8 @@ function analysis() {
 var stack = [];
 var defers = {};
 var blockCtr = 0;
-var breakLevels = [];
+var curLevel = 0;
+var escapeLevels = [];
 
 function analyzeFunc(node) {
 	var block = newBlock(null);
@@ -31,7 +32,7 @@ function analyzeFunc(node) {
 		throw new Nope("Unexpected function form", node);
 
 	// Capture function exit blocks
-	var level = stack[0].level;
+	var level = curLevel;
 	var oldDefers = defers[level];
 	delete defers[level];
 
@@ -74,6 +75,10 @@ function analyzeBlock(node, block) {
 	}
 }
 
+function killsNext(block) {
+	return block.dead || block.returns || block.breaks;
+}
+
 function analyzeStmt(node) {
 	var entryBlock = stack[0];
 	var stmt = analyzeStmt;
@@ -88,32 +93,38 @@ function analyzeStmt(node) {
 		if (node.elsePart)
 			analyzeBlock(node.elsePart, newBlock(entryBlock));
 		else
-			deferExit(entryBlock.level, entryBlock);
+			deferExit(curLevel, entryBlock);
 		break;
 	case DO:
 	case FOR:
 	case WHILE:
-		breakLevels.unshift(entryBlock.level);
+		escapeLevels.unshift(curLevel);
 		// ignore conditions etc.
 		// Not even bothering with loop analysis... out of scope for this project
 		entryBlock.over = true;
 		analyzeBlock(node.body, newBlock(entryBlock));
-		breakLevels.shift();
+		escapeLevels.shift();
 		break;
 	case SWITCH:
-		breakLevels.unshift(entryBlock.level);
+		var breakLevel = curLevel;
+		var caseLevel = ++curLevel;
+		escapeLevels.unshift(breakLevel);
 		entryBlock.over = true;
-		var fallThrough = false;
+		var exitBlock, fallThroughs = false;
 		node.cases.forEach(function (casa) {
 			var caseEntry = newBlock(entryBlock);
-			if (fallThrough)
-				addExit(fallThrough, caseEntry);
-			var exitBlock = analyzeBlock(casa.statements, caseEntry);
-			fallThrough = exitBlock.dead ? false : exitBlock;
-			if (!fallThrough)
-				deferExit(breakLevels[0], exitBlock);
+			if (fallThroughs) {
+				fallThroughs.forEach(function (fall) {
+					addExit(fall, caseEntry);
+				});
+			}
+			analyzeBlock(casa.statements, caseEntry);
+			fallThroughs = defers[caseLevel];
+			if (fallThroughs)
+				delete defers[caseLevel];
 		});
-		breakLevels.shift();
+		curLevel--;
+		escapeLevels.shift();
 		break;
 	case TRY:
 		// This is not correct.
@@ -135,10 +146,8 @@ function analyzeStmt(node) {
 	case BREAK:
 	case CONTINUE:
 		// assuming switch
-		entryBlock.over = true;
-		deferExit(breakLevels[0], entryBlock);
-		var deadBlock = newBlock(entryBlock);
-		deadBlock.dead = true;
+		entryBlock.over = entryBlock.breaks = true;
+		deferExit(escapeLevels[0], entryBlock);
 		break;
 	case RETURN:
 		entryBlock.over = entryBlock.returns = true;
@@ -167,11 +176,10 @@ function analyzeStmts(nodes, block) {
 	if (!block)
 		throw new Nope("Block required", nodes.length ? nodes[0] : null);
 	// new scope
-	var prevBlock = stack[0] || {level: 0};
-	var prevLevel = prevBlock.level;
-	var thisLevel = prevLevel + 1;
-	block.level = thisLevel;
-	if (prevBlock.dead || prevBlock.returns)
+	var prevBlock = stack[0] || {};
+	var prevLevel = curLevel;
+	var thisLevel = ++curLevel;
+	if (killsNext(prevBlock))
 		block.dead = true;
 	stack.unshift(block);
 
@@ -209,6 +217,7 @@ function analyzeStmts(nodes, block) {
 		});
 		delete defers[thisLevel];
 	}
+	curLevel--;
 	return stack.shift();
 }
 
@@ -467,7 +476,7 @@ function stmts(nodes) {
 }
 
 function dumpBlock(node) {
-	if (node.type == BLOCK || stack.length < 1)
+	if (!stack.length)
 		return;
 	var out = 'has no block';
 	var block = node.astBlock;

@@ -6,6 +6,8 @@ function augment(x, y, cb) {
 
 function branch(x, y, cb) {
 	switch (x) {
+		case 0:
+			assert.ok(false);
 		case 1:
 		{
 			z <- augment(y, 2);

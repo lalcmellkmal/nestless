@@ -303,12 +303,14 @@ function close(str) {
 	stack[0].closes.unshift(str);
 }
 
+var scopeInherited = ['canYield', 'canThrow', 'canEscape'];
+
 function block(node, extra) {
 	if (node.type != BLOCK)
 		throw new Nope("That's no block!", node);
 	var prev = stack[0] || {level: 0};
 	var scope = {level: prev.level+1, closes: [], callback: prev.callback};
-	['canYield', 'canThrow', 'canBreakContinue'].forEach(function (inherit) {
+	scopeInherited.forEach(function (inherit) {
 		scope[inherit] = prev[inherit];
 	});
 	if (extra)
@@ -408,13 +410,13 @@ function stmt(node) {
 	case FOR_IN:
 	case WHILE:
 		if (node.body.type == BLOCK)
-			block(node.body, {canBreakContinue: true});
+			block(node.body, {canEscape: true});
 		else
 			stmt(node.body);
 		break;
 	case SWITCH:
 		node.cases.forEach(function (casa) {
-			block(casa.statements, {canBreakContinue: true, cannotBind: true});
+			block(casa.statements, {canEscape: true, cannotBind: true});
 		});
 		break;
 	case TRY:
@@ -432,7 +434,7 @@ function stmt(node) {
 
 	case BREAK:
 	case CONTINUE:
-		if (!scope.canBreakContinue)
+		if (!scope.canEscape)
 			throw new Nope("Can't " + (node.type == BREAK ? "break" : "continue") + " after binding", node);
 		break;
 
@@ -463,7 +465,7 @@ function stmt(node) {
 			throw new Nope("Can't bind inside a function without a callback parameter", node);
 		scope.canYield = true;
 		scope.canThrow = true;
-		scope.canBreakContinue = false;
+		scope.canEscape = false;
 		replace(node.start, arrow.rhs.start, '');
 		var err = 'err', params = filterUnderscores(arrow.params);
 		params.unshift(err);

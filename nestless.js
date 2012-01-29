@@ -414,7 +414,7 @@ function stmt(node) {
 			mutator.expr(node.children[0]);
 		if (!stack.length)
 			throw new Nope("Can't return in global scope", node);
-		if (scope.callback && scope.canYield) {
+		if (node.value && scope.callback && scope.canYield) {
 			replace(node.start, node.start+7, 'return '+scope.callback+'(null, ');
 			insert(node.value.end, ')');
 			scope.returnAfter = true;

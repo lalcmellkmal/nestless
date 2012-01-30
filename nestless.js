@@ -497,7 +497,7 @@ function stmt(node) {
 	case THROW:
 		if (!stack.length)
 			break;
-		if (scope.callback && stack.canThrow) {
+		if (scope.callback && scope.canThrow) {
 			replace(node.start, node.start+6, 'return '+scope.callback+'(');
 			insert(node.exception.end, ')');
 		}

@@ -1,0 +1,20 @@
+{
+  "author": "Lal'C Mellk Mal <lalc@doushio.com>",
+  "name": "nestless",
+  "description": "Async callback flattening JS rewriter",
+  "version": "0.0.0",
+  "main": "nestless",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:lalcmellkmal/nestless.git"
+  },
+  "engines": {
+    "node": "~0.6.2"
+  },
+  "script": {
+    "test": "make test"
+  },
+  "devDependencies": {
+    "ansi-color": "*"
+  }
+}

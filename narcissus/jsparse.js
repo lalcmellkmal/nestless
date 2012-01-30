@@ -765,7 +765,7 @@ Narcissus.parser = (function() {
           case DO:
             n = this.newNode({ isLoop: true });
             n.blockComments = comments;
-            x2 = this.x.pushTarget(n).next();
+            x2 = this.x.pushTarget(n).nest();
             this.withContext(x2, function() {
                 n.body = this.Statement();
             });
@@ -864,7 +864,7 @@ Narcissus.parser = (function() {
             n = this.newNode();
             n.blockComments = comments;
             n.object = this.HeadExpression();
-            x2 = this.x.pushTarget(n).next();
+            x2 = this.x.pushTarget(n).nest();
             this.withContext(x2, function() {
                 n.body = this.Statement();
             });

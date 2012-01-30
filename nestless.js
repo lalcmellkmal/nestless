@@ -11,7 +11,8 @@ const CALLBACK_RE = /c(?:all)?b(?:ack)?/i;
 const FUNC_BIND_PREFIX = '(';
 const FUNC_BIND_SUFFIX = '}).bind(this)); ';
 
-var OPTS = {};
+var OPTS = {verbose: false, debug: false};
+exports.options = OPTS;
 
 /* ANALYSIS */
 
@@ -709,7 +710,7 @@ util.inherits(Nope, Error);
 
 /* MAIN */
 
-function flatten(src, filename, outputFilename) {
+function rewrite(src, filename, outputFilename) {
 	var root = parser.parse(src, filename);
 	/* clear out the damn tokenizer for debugging */
 	for (var k in root.tokenizer)
@@ -741,7 +742,7 @@ function flatten(src, filename, outputFilename) {
 
 	emit(src, results, outputFilename);
 }
-exports.flatten = flatten;
+exports.rewrite = rewrite;
 
 if (require.main === module) {
 	var args = process.argv.slice(2);
@@ -797,7 +798,7 @@ if (require.main === module) {
 				dest = (m ? m[1] : filename) + '.js';
 			}
 			var src = fs.readFileSync(filename, 'UTF-8');
-			flatten(src, filename, dest);
+			rewrite(src, filename, dest);
 		});
 	}
 	else {
@@ -817,7 +818,7 @@ if (require.main === module) {
 				pos += buf.length;
 			});
 			var src = dest.toString('UTF-8');
-			flatten(src, '<stdin>', outputFilename);
+			rewrite(src, '<stdin>', outputFilename);
 		});
 	}
 }

@@ -1,0 +1,10 @@
+Usage: nestless [-o <out>] [-v] [-g] <in>
+
+Options:
+	-o <filename>	Output filename
+
+	-v		Dump ranges and contents of js rewrites
+	-g		Dump debug information including control flow
+
+	* Stdin/stdout supported
+	* If input filename ends in .nl, outputs to the equivalent .js

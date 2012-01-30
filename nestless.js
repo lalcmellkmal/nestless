@@ -744,6 +744,16 @@ function rewrite(src, filename, outputFilename) {
 }
 exports.rewrite = rewrite;
 
+function usage() {
+	try {
+		console.error(fs.readFileSync(require('path').join(__dirname, 'usage.txt'), 'UTF-8'));
+	}
+	catch (e) {
+		console.error("Couldn't find usage information. Sorry. Consult usage.txt in the source repo.");
+	}
+	process.exit(-1);
+}
+
 if (require.main === module) {
 	var args = process.argv.slice(2);
 	var targets = [];
@@ -761,17 +771,19 @@ if (require.main === module) {
 				targets = targets.concat(args);
 				break;
 			}
-			else if (['-v', '--verbose'].indexOf(arg) >= 0)
-				OPTS.verbose = true;
 			else if (['-g', '--debug'].indexOf(arg) >= 0)
 				OPTS.debug = true;
-			else if (arg == '-o') {
+			else if (['-h', '--help'].indexOf(arg) >= 0)
+				usage();
+			else if (['-o', '--outfile'].indexOf(arg) >= 0) {
 				if (outputFilename)
 					throw new Error("Multiple output filenames specified.");
 				outputFilename = args.shift();
 				if (!outputFilename)
 					throw new Error("Output filename required.");
 			}
+			else if (['-v', '--verbose'].indexOf(arg) >= 0)
+				OPTS.verbose = true;
 			else
 				throw new Error("Invalid argument: " + arg);
 		}
@@ -780,7 +792,7 @@ if (require.main === module) {
 	}
 	catch (e) {
 		console.error(e.message);
-		process.exit(-1);
+		usage();
 	}
 
 	if (!OPTS.debug) {

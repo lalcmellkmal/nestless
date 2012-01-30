@@ -8,6 +8,8 @@ require('./jsdefs');
 var tokenIds = Narcissus.definitions.tokenIds;
 eval(Narcissus.definitions.consts);
 const CALLBACK_RE = /c(?:all)?b(?:ack)?/i;
+const FUNC_BIND_PREFIX = '(';
+const FUNC_BIND_SUFFIX = '}).bind(this)); ';
 
 var OPTS = {};
 
@@ -20,8 +22,12 @@ var defers = {};
 var blockCtr = 0;
 var curLevel = 0;
 var escapeLevels = [];
+var curFunc = null;
 
 function analyzeFunc(node) {
+	var outerFunc = curFunc;
+	curFunc = node;
+
 	var block = newBlock(null);
 	block.funcEntry = true;
 	node.entryBlock = block;
@@ -49,6 +55,8 @@ function analyzeFunc(node) {
 		defers[level] = oldDefers;
 	else
 		delete defers[level];
+
+	curFunc = outerFunc;
 }
 
 function analyzeExpr(node) {
@@ -61,6 +69,11 @@ function analyzeExpr(node) {
 
 	case FUNCTION:
 		analyzeFunc(node);
+		break;
+
+	case THIS:
+		if (curFunc)
+			curFunc.usesThis = true;
 		break;
 
 	default:
@@ -164,8 +177,8 @@ function analyzeStmt(node) {
 		break;
 	case RETURN:
 		entryBlock.over = entryBlock.returns = true;
-		if (node.children.length)
-			analyzeExpr(node.children[0]);
+		if (node.value)
+			analyzeExpr(node.value);
 		break;
 	case SEMICOLON:
 		if (!splitArrow(node))
@@ -303,7 +316,7 @@ function close(str) {
 	stack[0].closes.unshift(str);
 }
 
-var scopeInherited = ['canYield', 'canThrow', 'canEscape'];
+var scopeInherited = ['canYield', 'canThrow', 'canEscape', 'usesThis'];
 
 function block(node, extra) {
 	if (node.type != BLOCK)
@@ -341,6 +354,8 @@ function block(node, extra) {
 function mutateFunc(node) {
 	var prev = stack[0] || {level: 0};
 	var scope = {level: prev.level+1, closes: []};
+	if (node.usesThis)
+		scope.usesThis = true;
 	stack.unshift(scope);
 
 	var params = node.params;
@@ -439,14 +454,15 @@ function stmt(node) {
 		break;
 
 	case RETURN:
-		if (node.children.length)
-			mutateExpr(node.children[0]);
 		if (!stack.length)
 			throw new Nope("Can't return in global scope", node);
-		if (node.value && scope.callback && scope.canYield) {
-			replace(node.start, node.start+7, 'return '+scope.callback+'(null, ');
-			insert(node.value.end, ')');
-			scope.returnAfter = true;
+		if (node.value) {
+			mutateExpr(node.value);
+			if (scope.callback && scope.canYield) {
+				replace(node.start, node.start+7, 'return '+scope.callback+'(null, ');
+				insert(node.value.end, ')');
+				scope.returnAfter = true;
+			}
 		}
 		break;
 
@@ -470,15 +486,17 @@ function stmt(node) {
 		var err = 'err', params = filterUnderscores(arrow.params);
 		params.unshift(err);
 		var newCall = 'function (' + params.join(', ') + ') { if ('+err+') return '+cb+'('+err;
+		var captureThis = scope.usesThis;
+		if (captureThis)
+			newCall = FUNC_BIND_PREFIX + newCall;
 		if (arrow.argList.children.length > 0)
 			newCall = ', ' + newCall;
 		replace(arrow.argList.end, node.end, newCall);
-		close('}); ');
+		close(captureThis ? FUNC_BIND_SUFFIX : '}); ');
 		break;
 	case THROW:
 		if (!stack.length)
 			break;
-		var scope = stack[0];
 		if (scope.callback && stack.canThrow) {
 			replace(node.start, node.start+6, 'return '+scope.callback+'(');
 			insert(node.exception.end, ')');
@@ -513,6 +531,8 @@ function dumpBlock(node) {
 	var block = node.astBlock;
 	if (block) {
 		out = 'block ' + block.index;
+		if (block.usesThis)
+			out = '@' + out;
 		if (block.funcEntry)
 			out = 'entry ' + out;
 		if (block.exits.length) {

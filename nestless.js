@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 var fs = require('fs'),
-    parser = require('./parser'),
+    parser = require('./narcissus/parser'),
     util = require('util');
 
 // Global constants
-require('./jsdefs');
+require('./narcissus/jsdefs');
 var tokenIds = Narcissus.definitions.tokenIds;
 eval(Narcissus.definitions.consts);
 const CALLBACK_RE = /c(?:all)?b(?:ack)?/i;

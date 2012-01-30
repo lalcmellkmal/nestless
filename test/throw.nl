@@ -18,9 +18,14 @@ function go(cb) {
 		assert.ok(caught);
 	}
 
-	throw 'Should become fail callback';
+	if (msg == common.message) {
+		_ <- common.read();
+		throw 'Should become fail callback';
+	}
+	return 'Should not succeed';
 }
 
-go(function (err) {
+go(function (err, result) {
 	assert.equal(err, 'Should become fail callback');
+	assert.notEqual(result, 'Should not succeed');
 });

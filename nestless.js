@@ -500,6 +500,7 @@ function stmt(node) {
 		if (scope.callback && scope.canThrow) {
 			replace(node.start, node.start+6, 'return '+scope.callback+'(');
 			insert(node.exception.end, ')');
+			scope.returnAfter = true;
 		}
 		break;
 	case VAR:

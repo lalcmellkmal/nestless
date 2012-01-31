@@ -8,10 +8,11 @@ function go(cb) {
 	_ <- zero();
 	a <- one(1);
 	b, c <- two(2, 3);
-	return a + b + c;
+	return a, b, c, a + b + c;
 }
 
-go(function (err, result) {
+go(function (err, a, b, c, result) {
 	assert.ifError(err);
 	assert.equal(result, 6);
+	assert.equal(result, a + b + c);
 });

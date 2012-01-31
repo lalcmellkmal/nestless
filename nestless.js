@@ -36,7 +36,7 @@ function analyzeFunc(node) {
 	if (script.type == GENERATOR)
 		script = script.body;
 	if (script.type != SCRIPT)
-		throw new Nope("Unexpected function form", node);
+		throw new Bug("Unexpected function form", node);
 
 	// Capture function exit blocks
 	var level = curLevel;
@@ -194,14 +194,13 @@ function analyzeStmt(node) {
 		});
 		break;
 	default:
-		console.error(node);
-		throw new Nope('Unexpected ' + nodeType(node), node);
+		throw new Bug('Unexpected ' + nodeType(node), node);
 	}
 }
 
 function analyzeStmts(nodes, block) {
 	if (!block)
-		throw new Nope("Block required", nodes.length ? nodes[0] : null);
+		throw new Bug("Block required", nodes.length ? nodes[0] : null);
 	// new scope
 	var prevBlock = stack[0] || {};
 	var prevLevel = curLevel;
@@ -295,21 +294,21 @@ var insertions = {};
 
 function replace(start, end, str) {
 	if (!start)
-		throw new Nope("Invalid start", start, end);
+		throw new Bug("Invalid start", start, end);
 	if (end < start)
-		throw new Nope("Replacement " + start + '..' + end + " would back up", end, start);
+		throw new Bug("Replacement " + start + '..' + end + " would back up", end, start);
 	if (start in replacements)
-		throw new Nope("Replacement exists", start, end);
+		throw new Bug("Replacement exists", start, end);
 	if (str.indexOf('\n') >= 0)
-		throw new Error("Replacement >>>" + str + "<<< would insert newline");
+		throw new Bug("Replacement >>>" + str + "<<< would insert newline", start, end);
 	replacements[start] = {end: end, str: str};
 }
 
 function insert(pos, str) {
 	if (!pos)
-		throw new Nope("Invalid insertion pos " + pos);
+		throw new Bug("Invalid insertion pos " + pos);
 	if (str.indexOf('\n') >= 0)
-		throw new Error("Insertion >>>" + str + "<<< would insert newline");
+		throw new Bug("Insertion >>>" + str + "<<< would insert newline");
 	var old = insertions[pos];
 	if (old)
 		old.push(str);
@@ -325,7 +324,7 @@ var scopeInherited = ['canYield', 'canThrow', 'canEscape', 'usesThis'];
 
 function block(node, extra) {
 	if (node.type != BLOCK)
-		throw new Nope("That's no block!", node);
+		throw new Bug("That's no block!", node);
 	var prev = stack[0] || {level: 0};
 	var scope = {level: prev.level+1, closes: [], callback: prev.callback};
 	scopeInherited.forEach(function (inherit) {
@@ -338,7 +337,7 @@ function block(node, extra) {
 	stack.unshift(scope);
 	stmts(node.children);
 	if (stack.shift() !== scope)
-		throw new Nope("Imbalanced block?!", node);
+		throw new Bug("Imbalanced block?!", node);
 
 	if (scope.returnAfter) {
 		var skip = false, last = node.children[node.children.length - 1];
@@ -374,7 +373,7 @@ function mutateFunc(node) {
 		script = script.body;
 	stmts(script.children);
 	if (stack.shift() !== scope)
-		throw new Nope("Imbalanced block?!", node);
+		throw new Bug("Imbalanced block?!", node);
 	if (scope.closes.length)
 		insert(node.end-1, scope.closes.join(''));
 }
@@ -515,8 +514,7 @@ function stmt(node) {
 		});
 		break;
 	default:
-		console.error(node);
-		throw new Nope('Unexpected ' + nodeType(node), node);
+		throw new Bug('Unexpected ' + nodeType(node), node);
 	}
 }
 
@@ -692,7 +690,7 @@ function splitArrow(node) {
 		throw new Nope('Call expected after arrow', arrow);
 	var argList = rhs.children[1];
 	if (rhs.children.length != 2 || argList.type != LIST)
-		throw new Nope('Unexpected call format', rhs);
+		throw new Bug('Unexpected call format', rhs);
 	return {rhs: rhs, argList: argList, params: params};
 }
 
@@ -712,6 +710,7 @@ function filterUnderscores(input) {
 	return params;
 }
 
+// User error
 function Nope(message, node, end) {
 	Error.call(this, message);
 	Error.captureStackTrace(this, this.constructor);
@@ -719,6 +718,15 @@ function Nope(message, node, end) {
 	this.node = (node instanceof Number) ? {start: node, end: end} : node;
 }
 util.inherits(Nope, Error);
+
+// Internal error
+function Bug(message, node, end) {
+	Error.call(this, message);
+	Error.captureStackTrace(this, this.constructor);
+	this.message = message;
+	this.node = (node instanceof Number) ? {start: node, end: end} : node;
+}
+util.inherits(Bug, Error);
 
 /* MAIN */
 
@@ -739,7 +747,7 @@ function rewrite(src, filename, outputFilename) {
 		root.children.forEach(mutateStmt);
 	}
 	catch (e) {
-		if (!(e instanceof Nope))
+		if (!(e instanceof Nope) && !(e instanceof Bug))
 			throw e;
 		if (e.node) {
 			var node = e.node;

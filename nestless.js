@@ -157,18 +157,21 @@ function analyzeStmt(node) {
 		escapeLevels.shift();
 		break;
 	case TRY:
-		// This is not correct.
+		// This will never be correct due to exception semantics
+		// Shouldn't be using exceptions in an async function anyway
 		entryBlock.over = true;
 		var tryBlock = newBlock(entryBlock);
 		analyzeBlock(node.tryBlock, tryBlock);
 		node.catchClauses.forEach(function (clause) {
 			analyzeBlock(clause.block, newBlock(tryBlock));
 		});
-		var finallyBlock = newBlock(entryBlock);
-		if (node.finallyBlock)
+		if (node.finallyBlock) {
+			var finallyBlock = newBlock(tryBlock);
+			consumeEachDefer(curLevel, function (block) {
+				addExit(block, finallyBlock);
+			});
 			analyzeBlock(node.finallyBlock, finallyBlock);
-		else
-			analyzeBlock([], finallyBlock);
+		}
 		break;
 	case FUNCTION:
 		analyzeFunc(node);
@@ -222,12 +225,9 @@ function analyzeStmts(nodes, block) {
 		}
 
 		// Since this is a real block, any defered exits should go here
-		if (thisLevel in defers) {
-			defers[thisLevel].forEach(function (oldBlock) {
-				addExit(oldBlock, block);
-			});
-			delete defers[thisLevel];
-		}
+		consumeEachDefer(thisLevel, function (oldBlock) {
+			addExit(oldBlock, block);
+		});
 
 		// Do this stmt
 		var node = nodes[i];
@@ -240,12 +240,9 @@ function analyzeStmts(nodes, block) {
 		deferExit(prevLevel, src);
 	});
 	// let dangling exits pass-through to outer scope
-	if (thisLevel in defers) {
-		defers[thisLevel].forEach(function (block) {
-			deferExit(prevLevel, block);
-		});
-		delete defers[thisLevel];
-	}
+	consumeEachDefer(thisLevel, function (block) {
+		deferExit(prevLevel, block);
+	});
 	curLevel--;
 	return stack.shift();
 }
@@ -259,6 +256,13 @@ function deferExit(toLevel, block) {
 function addExit(fromBlock, toBlock) {
 	fromBlock.exits.push(toBlock);
 	toBlock.entrances.push(fromBlock);
+}
+
+function consumeEachDefer(level, func) {
+	if (level in defers) {
+		defers[level].forEach(func);
+		delete defers[level];
+	}
 }
 
 function blocksNeedingExit(block) {

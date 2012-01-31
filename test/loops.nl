@@ -8,6 +8,9 @@ function go(cb) {
 		break;
 		throw 'nope';
 	}
+	for (var k in {foo: 'bar'}) {
+		break;
+	}
 	while (true) {
 		break;
 		throw 'nope';

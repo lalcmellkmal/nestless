@@ -125,8 +125,11 @@ function analyzeStmt(node) {
 	case FOR:
 	case FOR_IN:
 	case WHILE:
+		['setup', 'condition', 'update', 'varDecl', 'object'].forEach(function (k) {
+			if (node[k])
+				analyzeExpr(node[k]);
+		});
 		escapeLevels.unshift(curLevel);
-		// ignore conditions etc.
 		// Not even bothering with loop analysis... out of scope for this project
 		entryBlock.over = true;
 		analyzeBlock(node.body, newBlock(entryBlock));

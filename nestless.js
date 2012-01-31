@@ -300,12 +300,16 @@ function replace(start, end, str) {
 		throw new Nope("Replacement " + start + '..' + end + " would back up", end, start);
 	if (start in replacements)
 		throw new Nope("Replacement exists", start, end);
+	if (str.indexOf('\n') >= 0)
+		throw new Error("Replacement >>>" + str + "<<< would insert newline");
 	replacements[start] = {end: end, str: str};
 }
 
 function insert(pos, str) {
 	if (!pos)
 		throw new Nope("Invalid insertion pos " + pos);
+	if (str.indexOf('\n') >= 0)
+		throw new Error("Insertion >>>" + str + "<<< would insert newline");
 	var old = insertions[pos];
 	if (old)
 		old.push(str);
@@ -637,6 +641,9 @@ function emit(src, results, out) {
 			out.write(ins.join(''));
 		var repl = replacements[pos];
 		if (repl) {
+			var removed = src.substring(pos, repl.end);
+			if (removed.indexOf('\n') >= 0)
+				throw new Error("Replacement >>>" + repl.str + "<<< would squash newline of >>>" + removed + "<<<");
 			out.write(repl.str);
 			pos = repl.end;
 		}

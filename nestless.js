@@ -487,6 +487,8 @@ function stmt(node) {
 			throw new Nope("Can't bind in global scope; please wrap in {}s", node);
 		if (scope.cannotBind)
 			throw new Nope("Can't bind in a switch; please wrap in {}s", node);
+		if (node.astBlock && node.astBlock.braceless)
+			throw new Nope("Can't bind in a single-statement block; please wrap in {}s", node);
 		var cb = scope.callback;
 		if (!cb)
 			throw new Nope("Can't bind inside a function without a callback parameter", node);

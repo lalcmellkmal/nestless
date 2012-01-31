@@ -35,8 +35,13 @@ See the test folder for more examples.
   It only handles a certain (common) case.
   Do not use nestless-generated code for anything important without examining the transformed output.
 * Loops are right out.
-  Use [async.js](https://github.com/caolan/async) or [TameJS](http://tamejs.org/) or write it out manually.
+  Use [async.js](https://github.com/caolan/async) or [TameJS](http://tamejs.org/).
 * Once you `return` a value, nestless tries to stop all execution in the function by possibly inserting more `return`s.
   Strange control flows may break this.
   I assume no responsibility if your callback never gets called or, worse, gets called multiple times.
-  Use `yield` instead of `return` if you want control flow to fall through.
+
+## Meta
+
+Install with `npm install -g nestless`.
+
+Many thanks to Mozilla for [Narcissus](https://github.com/mozilla/narcissus/) which parses the JavaScript and provides token boundaries for rewriting. Relevant bits of Narcissus have been patched and bundled with Nestless, and it assumes the same license.

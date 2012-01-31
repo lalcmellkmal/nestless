@@ -1,32 +1,30 @@
 # Nestless.js
 
-Rewrites synchronous-style flattened JS into callback-y JS.
+Rewrites synchronous-style flattened JS into callback-y JS **preserving line numbers**.
 
 Sample input:
 
 ```js
-    function cat(encoding, cb) {
-        filename <- askUser("Filename? ");
-        contents <- fs.readFile(filename, encoding);
-        if (contents.match(/piracy/))
-            throw "TAKEN DOWN";
-        return contents;
-    }
+function cat(encoding, cb) {
+    filename <- askUser("Filename? ");
+    contents <- fs.readFile(filename, encoding);
+    if (contents.match(/piracy/))
+        throw "TAKEN DOWN";
+    return contents;
+}
 ```
 
 becomes:
 
 ```js
-    function cat(encoding, cb) {
-        askUser("Filename? ", function (err, filename) { if (err) return cb(err);
-        fs.readFile(filename, encoding, function (err, contents) { if (err) return cb(err);
-        if (contents.match(/piracy/))
-            return cb("TAKEN DOWN");
-        return cb(null, contents);
-    }); }); }
+function cat(encoding, cb) {
+    askUser("Filename? ", function (err, filename) { if (err) return cb(err);
+    fs.readFile(filename, encoding, function (err, contents) { if (err) return cb(err);
+    if (contents.match(/piracy/))
+        return cb("TAKEN DOWN");
+    return cb(null, contents);
+}); }); }
 ```
-
-The transformation is braindead but it will always **preserve line numbers**.
 
 Every transformed function must take a last parameter called `callback` or `cb` and contain at least one arrow binding.
 
@@ -48,4 +46,4 @@ See the test folder for more examples.
 
 Install with `npm install -g nestless`.
 
-Many thanks to Mozilla for [Narcissus](https://github.com/mozilla/narcissus/) which parses the JavaScript and provides token boundaries for rewriting. Relevant bits of Narcissus have been patched and bundled with Nestless, and it assumes the same license.
+Many thanks to Brendan Eich and Mozilla for [Narcissus](https://github.com/mozilla/narcissus/) which parses the JavaScript and provides token boundaries for rewriting. Relevant bits of Narcissus have been patched and bundled with Nestless, and it assumes the same license.

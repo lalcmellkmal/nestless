@@ -4,6 +4,7 @@ Rewrites synchronous-style flattened JS into callback-y JS.
 
 Sample input:
 
+```js
     function cat(encoding, cb) {
         filename <- askUser("Filename? ");
         contents <- fs.readFile(filename, encoding);
@@ -11,9 +12,11 @@ Sample input:
             throw "TAKEN DOWN";
         return contents;
     }
+```
 
 becomes:
 
+```js
     function cat(encoding, cb) {
         askUser("Filename? ", function (err, filename) { if (err) return cb(err);
         fs.readFile(filename, encoding, function (err, contents) { if (err) return cb(err);
@@ -21,6 +24,7 @@ becomes:
             return cb("TAKEN DOWN");
         return cb(null, contents);
     }); }); }
+```
 
 The transformation is braindead but it will always **preserve line numbers**.
 

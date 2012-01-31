@@ -744,14 +744,22 @@ function rewrite(src, filename, outputFilename) {
 }
 exports.rewrite = rewrite;
 
+function commandName() {
+	var script = require('path').basename(process.argv[1]);
+	return script.match(/\.js$/) ? script.slice(0, -3) : script;
+}
+
 function usage() {
 	try {
-		console.error(fs.readFileSync(require('path').join(__dirname, 'usage.txt'), 'UTF-8'));
+		var usage = fs.readFileSync(require('path').join(__dirname, 'usage.txt'), 'UTF-8');
+		console.error(usage.replace(/nestless/g, commandName()));
 	}
 	catch (e) {
-		console.error("Couldn't find usage information. Sorry. Consult usage.txt in the source repo.");
+		console.error(commandName() + ": Couldn't find usage information. Sorry.\n Consult usage.txt in the source repo.");
 	}
-	process.exit(-1);
+	finally {
+		process.exit(-1);
+	}
 }
 
 if (require.main === module) {
@@ -791,13 +799,18 @@ if (require.main === module) {
 			throw new Error("Can't specify an output filename with multiple inputs.");
 	}
 	catch (e) {
-		console.error(e.message);
+		console.error(commandName() + ': ' + e.message);
 		usage();
 	}
 
 	if (!OPTS.debug) {
 		process.once('uncaughtException', function (err) {
-			console.error(err.message || err);
+			var bug = !(err instanceof Nope) && !(err instanceof SyntaxError);
+			err = err.message || err;
+			if (bug)
+				console.error(commandName() + ' internal error: ' + err + '\nPass -g to see debug information.');
+			else
+				console.error(err);
 			process.exit(1);
 		});
 	}

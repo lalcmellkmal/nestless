@@ -4,6 +4,7 @@ Options:
 	-o <filename>	Output filename
 
 	-v		Dump ranges and contents of js rewrites
+			(install ansi-color for more readable output)
 	-g		Dump debug information including control flow
 
 	* Stdin/stdout supported

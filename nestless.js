@@ -557,9 +557,14 @@ return {stmt: stmt, replacements: replacements, insertions: insertions};
 /* OUTPUT */
 
 function dumpPoints(results, src) {
-	var prev = 0;
+	var prev = 0, color;
+	try {
+		color = require('ansi-color');
+	}
+	catch (e) {
+		color = {set: function (s, c) { return s; }};
+	}
 	results.points.forEach(function (p) {
-		var color = require('ansi-color');
 		var width = 60, context = 10;
 		var ins = results.insertions[p];
 		var repl = results.replacements[p];

@@ -2,7 +2,7 @@
   "author": "Lal'C Mellk Mal <lalc@doushio.com>",
   "name": "nestless",
   "description": "Async callback flattening JS rewriter",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "main": "nestless",
   "homepage": "https://github.com/lalcmellkmal/nestless",
   "repository": {

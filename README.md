@@ -35,6 +35,12 @@ The transformation is opt-in per function. Every transformed function must take 
 After the first arrow binding, any `return` or `throw` in the same function *(not in contained functions!)* will be transformed to a callback invocation.
 See the test folder for more examples.
 
+## BONUS
+
+Lets you use Pythonic """multi-line string literals""".
+However, it's currently hacked in with a preprocessor. Don't put """ in
+comments or normal string literals.
+
 ## WARNING
 
 * Nestless is very dumb and hacky and comes without warranty.

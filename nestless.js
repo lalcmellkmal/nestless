@@ -657,6 +657,35 @@ function emit(src, results, out) {
 	}
 }
 
+/* PREPROCESSOR */
+
+function preprocessSource(src) {
+	// Turn multi-line literals into JS string literals
+	var parts = src.split(/"""/g);
+	if (parts.length % 2 == 0)
+		throw new Error('Imbalanced """s');
+	var literal = true, cursor = 0;
+	var out = [];
+	parts.forEach(function (orig) {
+		literal = !literal;
+		if (!literal) {
+			out.push(orig);
+			return;
+		}
+
+		// Make sure errant backslashes don't ruin our own escaping
+		var trans = orig.replace(/\\*"/g, function (m) {
+			return (m.length % 2) ? '\\' + m : '\\\\' + m;
+		});
+		trans = trans.replace(/\n/g, '\\n\\\n');
+		var m = trans.match(/\\+$/);
+		if (m && m[0].length % 2)
+			trans += '\\';
+		out.push('"' + trans + '"');
+	});
+	return out.join('');
+}
+
 /* HELPERS */
 
 function nodeType(node) {
@@ -740,6 +769,7 @@ util.inherits(Bug, Error);
 /* MAIN */
 
 function rewrite(src, filename, outputFilename) {
+	src = preprocessSource(src);
 	var root = parser.parse(src, filename);
 	/* clear out the damn tokenizer for debugging */
 	for (var k in root.tokenizer)

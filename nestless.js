@@ -188,6 +188,8 @@ function analyzeStmt(node) {
 			analyzeExpr(node.value);
 		break;
 	case SEMICOLON:
+		if (!node.expression)
+			break;
 		splitArrow(node);
 		analyzeExpr(node.expression);
 		break;
@@ -478,6 +480,8 @@ function stmt(node) {
 		break;
 
 	case SEMICOLON:
+		if (!node.expression)
+			break;
 		var arrow = splitArrow(node);
 		if (!arrow) {
 			mutateExpr(node.expression);
